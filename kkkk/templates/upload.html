@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертировать изображение</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Конвертировать изображение</h1>
+        </header>
+
+        <nav>
+            <a href="{{ url_for('index') }}">Главная</a>
+            <a href="{{ url_for('upload_file') }}" class="active">Конвертировать</a>
+            <a href="{{ url_for('history') }}">История</a>
+        </nav>
+
+        <main>
+            <div class="upload-section">
+                <form method="POST" enctype="multipart/form-data" class="upload-form">
+                    <div class="form-group">
+                        <label for="file">Выберите изображение:</label>
+                        <input type="file" id="file" name="file" accept="image/*" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="format">Формат вывода:</label>
+                        <select id="format" name="format">
+                            <option value="jpeg">JPEG</option>
+                            <option value="png">PNG</option>
+                            <option value="gif">GIF</option>
+                            <option value="bmp">BMP</option>
+                            <option value="webp">WEBP</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quality">Качество (1-100):</label>
+                        <input type="range" id="quality" name="quality" min="1" max="100" value="85">
+                        <span id="quality-value">85%</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Изменение размера (опционально):</label>
+                        <div class="resize-inputs">
+                            <input type="number" name="resize_width" placeholder="Ширина (px)">
+                            <span>×</span>
+                            <input type="number" name="resize_height" placeholder="Высота (px)">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Конвертировать</button>
+                </form>
+            </div>
+
+            {% if original and converted %}
+            <div class="result-section">
+                <h2>Результат конвертации</h2>
+
+                <div class="image-comparison">
+                    <div class="image-box">
+                        <h3>Оригинал</h3>
+                        <img src="{{ url_for('static', filename=original) }}" alt="Оригинал">
+                        <p>Формат: {{ conversion.original_format|upper }}</p>
+                        <p>Размер: {{ (conversion.original_size / 1024)|round(2) }} KB</p>
+                    </div>
+
+                    <div class="image-box">
+                        <h3>Результат</h3>
+                        <img src="{{ url_for('static', filename=converted) }}" alt="Конвертировано">
+                        <p>Формат: {{ conversion.converted_format|upper }}</p>
+                        <p>Размер: {{ (conversion.converted_size / 1024)|round(2) }} KB</p>
+                        <p>Качество: {{ conversion.quality }}%</p>
+                        <p>Сжатие: {{ conversion.get_size_reduction() }}%</p>
+                    </div>
+                </div>
+
+                <div class="download-buttons">
+                    <a href="{{ url_for('download_file', filename=conversion.converted_filename) }}" class="btn-primary">
+📥 Скачать результат
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        // Update quality value display
+        const qualitySlider = document.getElementById('quality');
+        const qualityValue = document.getElementById('quality-value');
+
+        qualitySlider.addEventListener('input', function() {
+            qualityValue.textContent = this.value + '%';
+        });
+    </script>
+</body>
+</html>
