@@ -18,4 +18,4 @@
 1. Клонируйте репозиторий:
 ```bash
 git clone https://github.com/ddhodfmfghm/kkkk.git
-cd image-converter
+cd kkkk
