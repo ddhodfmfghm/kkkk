@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертер изображений</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            color: #333;
+            background: #fafafa;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        main {
+            display: grid;
+            gap: 24px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title svg {
+            opacity: 0.7;
+        }
+
+        #drop-area {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f8f8f8;
+        }
+
+        #drop-area:hover {
+            border-color: #999;
+            background: #f0f0f0;
+        }
+
+        #drop-area.dragover {
+            border-color: #007bff;
+            background: #f0f7ff;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .select-btn {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .select-btn:hover {
+            background: #0056b3;
+        }
+
+        #selected-files {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #555;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .preview-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .preview-info {
+            padding: 8px;
+            font-size: 12px;
+        }
+
+        .preview-info div {
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .remove-btn {
+            width: 100%;
+            padding: 4px;
+            background: none;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .remove-btn:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .stats {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f8f8f8;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .stat {
+            text-align: center;
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 500;
+            color: #007bff;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Конвертер изображений</h1>
+        <div class="subtitle">Измените размер и формат нескольких изображений</div>
+    </header>
+
+    <main>
+        <div class="card">
+            <div class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Загрузка изображений
+            </div>
+
+            <div id="drop-area">
+                <div class="upload-icon">📁</div>
+                <div>Перетащите изображения сюда</div>
+                <div>или</div>
+                <button class="select-btn" onclick="document.getElementById('file-input').click()">
+                    Выбрать файлы
+                </button>
+                <input type="file" id="file-input" name="images" accept="image/*" multiple required>
+                <div id="selected-files">Файлы не выбраны</div>
+            </div>
+
+            <div class="stats" id="stats">
+                <div class="stat">
+                    <div class="stat-value" id="total-files">0</div>
+                    <div class="stat-label">Изображений</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="total-size">0</div>
+                    <div class="stat-label">Размер</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                </svg>
+                Настройки
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Ширина (пиксели)</label>
+                    <input type="number" name="width" placeholder="Авто" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Высота (пиксели)</label>
+                    <input type="number" name="height" placeholder="Авто" min="1">
+                </div>
+                <div class="form-group" style="grid-column: span 2">
+                    <label>Формат вывода</label>
+                    <select name="format">
+                        {% for format in formats %}
+                        <option value="{{ format }}">{{ format }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Предпросмотр
+            </div>
+
+            <div class="preview-container" id="preview-container">
+
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="clearAll()">Очистить все</button>
+            <button class="btn btn-primary" id="submit-btn" onclick="submitForm()">
+                <span class="loading" id="loading-spinner" style="display: none;">
+                    <span class="spinner"></span>
+                </span>
+                Обработать
+            </button>
+        </div>
+    </main>
+
+    <script>
+        let images = [];
+        const dropArea = document.getElementById('drop-area');
+        const fileInput = document.getElementById('file-input');
+        const selectedFiles = document.getElementById('selected-files');
+        const previewContainer = document.getElementById('preview-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        // Drag & Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+            document.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+        });
+
+        dropArea.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFiles, false);
+
+        function handleDrop(e) {
+            const files = e.dataTransfer.files;
+            handleFiles({ target: { files } });
+        }
+
+        function handleFiles(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        images.push({
+                            file: file,
+                            preview: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                        updateUI();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function updateUI() {
+            // Обновляем статистику
+            selectedFiles.textContent = `${images.length} файл(ов) выбрано`;
+            document.getElementById('total-files').textContent = images.length;
+
+            const totalSize = images.reduce((sum, img) => sum + img.file.size, 0);
+            document.getElementById('total-size').textContent = formatBytes(totalSize);
+
+            // Обновляем предпросмотр
+            previewContainer.innerHTML = '';
+            images.forEach((img, index) => {
+                const item = document.createElement('div');
+                item.className = 'preview-item';
+                item.innerHTML = `
+                    <img src="${img.preview}" class="preview-image" alt="Preview">
+                    <div class="preview-info">
+                        <div>${img.file.name}</div>
+                        <div>${img.width} × ${img.height}</div>
+                        <button class="remove-btn" onclick="removeImage(${index})">Удалить</button>
+                    </div>
+                `;
+                previewContainer.appendChild(item);
+            });
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function removeImage(index) {
+            images.splice(index, 1);
+            updateUI();
+        }
+
+        function clearAll() {
+            if (images.length > 0 && confirm('Удалить все изображения?')) {
+                images = [];
+                updateUI();
+            }
+        }
+
+        async function submitForm() {
+            if (images.length === 0) {
+                alert('Выберите хотя бы одно изображение');
+                return;
+            }
+
+            const formData = new FormData();
+            images.forEach(img => formData.append('images', img.file));
+
+            const width = document.querySelector('input[name="width"]').value;
+            const height = document.querySelector('input[name="height"]').value;
+            const format = document.querySelector('select[name="format"]').value;
+
+            if (width) formData.append('width', width);
+            if (height) formData.append('height', height);
+            formData.append('format', format);
+
+            loadingSpinner.style.display = 'inline-block';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                const filename = images.length === 1
+                    ? images[0].file.name.replace(/\.[^/.]+$/, "") + '_converted.' + format.toLowerCase()
+                    : 'images.zip';
+
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            } finally {
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            }
+        }
+
+
+        updateUI();
+    </script>
+</body>
+
+</html>
