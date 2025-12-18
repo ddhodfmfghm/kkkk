@@ -295,7 +295,18 @@
         <a href="{{ url_for('logout') }}">Выход</a>
         </div>
     </header>
-
+    <header>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px;">
+        <div style="font-weight: 500;">{{ session.username }}</div>
+        <div style="display: flex; gap: 15px;">
+            <a href="{{ url_for('index') }}" style="color: #007bff; text-decoration: none;">Конвертер</a>
+            <a href="{{ url_for('history') }}" style="color: #007bff; text-decoration: none;">
+                История ({{ history_count }})
+            </a>
+            <a href="{{ url_for('logout') }}" style="color: #dc3545; text-decoration: none;">Выход</a>
+        </div>
+    </div>
+</header>
     <header>
         <h1>Конвертер изображений</h1>
         <div class="subtitle">Измените размер и формат нескольких изображений</div>

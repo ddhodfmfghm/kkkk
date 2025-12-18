@@ -2,12 +2,11 @@ import random
 import string
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from flask import Flask, render_template, request, send_file
+from datetime import datetime
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, jsonify
 from PIL import Image
 import io
 import zipfile
-
 
 app = Flask(__name__)
 app.secret_key = '123'
@@ -17,6 +16,7 @@ SUPPORTED_FORMATS = ['JPEG', 'PNG', 'BMP', 'GIF', 'WEBP']
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, 'database.db')
+
 
 def init_db():
     connection = sqlite3.connect(DB_FILE)
@@ -31,13 +31,30 @@ def init_db():
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS conversion_history (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER,
+            filename TEXT,
+            original_format TEXT,
+            converted_format TEXT,
+            width INTEGER,
+            height INTEGER,
+            file_size INTEGER,
+            converted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
     connection.commit()
     connection.close()
+
 
 def get_db_connection():
     connection = sqlite3.connect(DB_FILE)
     connection.row_factory = sqlite3.Row
     return connection
+
 
 def user_exists(username):
     connection = get_db_connection()
@@ -49,9 +66,39 @@ def user_exists(username):
 def add_user(username, password, role='user'):
     connection = get_db_connection()
     connection.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-                 (username, password, role))
+                       (username, password, role))
     connection.commit()
     connection.close()
+
+
+def add_to_history(user_id, filename, original_format, converted_format, width, height, file_size):
+    connection = get_db_connection()
+    connection.execute('''
+        INSERT INTO conversion_history (user_id, filename, original_format, converted_format, width, height, file_size)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, filename, original_format, converted_format, width, height, file_size))
+    connection.commit()
+    connection.close()
+
+
+def get_user_id(username):
+    connection = get_db_connection()
+    user = connection.execute('SELECT id FROM users WHERE username = ?', (username,)).fetchone()
+    connection.close()
+    return user['id'] if user else None
+
+
+def get_conversion_history(user_id, limit=50):
+    connection = get_db_connection()
+    history = connection.execute('''
+        SELECT * FROM conversion_history 
+        WHERE user_id = ? 
+        ORDER BY converted_at DESC 
+        LIMIT ?
+    ''', (user_id, limit)).fetchall()
+    connection.close()
+    return [dict(row) for row in history]
+
 
 def login_required(f):
     def decorated_function(*args, **kwargs):
@@ -82,6 +129,8 @@ def login():
         if user:
             session['username'] = user['username']
             session['role'] = user['role']
+            session['user_id'] = user['id']
+            flash('Вход выполнен успешно!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Неверное имя пользователя или пароль', 'error')
@@ -124,9 +173,12 @@ def logout():
     return redirect(url_for('login'))
 
 
-
-
-
+@app.route('/history')
+@login_required
+def history():
+    user_id = get_user_id(session['username'])
+    history_data = get_conversion_history(user_id)
+    return render_template('history.html', history=history_data)
 
 
 def process_image(img, width, height, format):
@@ -147,15 +199,16 @@ def process_image(img, width, height, format):
     return img
 
 
-
-
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', formats=SUPPORTED_FORMATS)
+    user_id = get_user_id(session['username'])
+    history_count = len(get_conversion_history(user_id, limit=5))
+    return render_template('index.html', formats=SUPPORTED_FORMATS, history_count=history_count)
 
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_images():
     files = request.files.getlist('images')
     if not files or files[0].filename == '':
@@ -169,21 +222,36 @@ def upload_images():
         format = 'JPEG'
 
     processed = []
+    user_id = get_user_id(session['username'])
 
     for file in files:
         try:
+            original_format = file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'UNKNOWN'
             img = Image.open(file.stream)
             img = process_image(img, width, height, format)
 
             img_bytes = io.BytesIO()
             img.save(img_bytes, format=format, quality=90)
             img_bytes.seek(0)
+            file_size = len(img_bytes.getvalue())
+
+
+            add_to_history(
+                user_id=user_id,
+                filename=file.filename,
+                original_format=original_format,
+                converted_format=format,
+                width=width or img.width,
+                height=height or img.height,
+                file_size=file_size
+            )
 
             processed.append({
                 'data': img_bytes,
                 'name': file.filename.rsplit('.', 1)[0] + f'.{format.lower()}'
             })
-        except:
+        except Exception as e:
+            print(f"Error processing image: {e}")
             continue
 
     if not processed:
@@ -210,6 +278,27 @@ def upload_images():
         download_name='images.zip'
     )
 
+
+@app.route('/api/history')
+@login_required
+def api_history():
+    user_id = get_user_id(session['username'])
+    history_data = get_conversion_history(user_id, limit=20)
+
+
+    for item in history_data:
+        item['converted_at'] = datetime.strptime(item['converted_at'], '%Y-%m-%d %H:%M:%S').strftime('%d.%m.%Y %H:%M')
+        item['file_size'] = format_file_size(item['file_size'])
+
+    return jsonify(history_data)
+
+
+def format_file_size(size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} TB"
 
 
 if __name__ == '__main__':
