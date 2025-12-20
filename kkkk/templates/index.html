@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -286,10 +287,58 @@
             font-size: 12px;
             margin-top: 4px;
         }
+
+        /* Прогресс-бар */
+        .progress-container {
+            display: none;
+            margin-top: 20px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 20px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .progress-info {
+            display: none;
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .progress-info.active {
+            display: block;
+        }
+
+        .progress-percentage {
+            font-weight: 500;
+            color: #007bff;
+        }
+
+        .progress-filename {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body>
-
 
     <header>
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px;">
@@ -297,8 +346,7 @@
         <div style="display: flex; gap: 15px;">
             <a href="{{ url_for('index') }}" style="color: #007bff; text-decoration: none;">Конвертер</a>
             <a href="{{ url_for('history') }}" style="color: #007bff; text-decoration: none;">
-                История ({{ history_count }})
-            </a>
+                История ({{ history_count }})</a>
             <a href="{{ url_for('logout') }}" style="color: #dc3545; text-decoration: none;">Выход</a>
         </div>
     </div>
@@ -363,12 +411,11 @@
                 </div>
                 <div class="form-group" style="grid-column: span 2">
                     <label>Формат вывода</label>
-
-<select name="format">
-    {% for format in formats %}
-    <option value="{{ format }}">{{ format }}</option>
-    {% endfor %}
-</select>
+                    <select name="format">
+                        {% for format in formats %}
+                        <option value="{{ format }}">{{ format }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
         </div>
@@ -384,8 +431,18 @@
             </div>
 
             <div class="preview-container" id="preview-container">
-
+                <!-- Превышки будут здесь -->
             </div>
+        </div>
+
+        <!-- Прогресс-бар -->
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar" id="progress-bar"></div>
+        </div>
+
+        <div class="progress-info" id="progress-info">
+            <div>Обработка: <span class="progress-percentage" id="progress-percentage">0%</span></div>
+            <div class="progress-filename" id="progress-filename"></div>
         </div>
 
         <div class="actions">
@@ -408,7 +465,14 @@
         const submitBtn = document.getElementById('submit-btn');
         const loadingSpinner = document.getElementById('loading-spinner');
 
+        // Элементы прогресс-бара
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressInfo = document.getElementById('progress-info');
+        const progressPercentage = document.getElementById('progress-percentage');
+        const progressFilename = document.getElementById('progress-filename');
 
+        // Обработчики drag & drop
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropArea.addEventListener(eventName, preventDefaults, false);
             document.addEventListener(eventName, preventDefaults, false);
@@ -435,48 +499,46 @@
             handleFiles({ target: { files } });
         }
 
+        function handleFiles(e) {
+            const files = Array.from(e.target.files);
+            files.forEach(file => {
+                const isImage = file.type.startsWith('image/');
+                const isHeic = file.name.toLowerCase().endsWith('.heic') ||
+                               file.name.toLowerCase().endsWith('.heif');
 
-function handleFiles(e) {
-    const files = Array.from(e.target.files);
-    files.forEach(file => {
+                if (!isImage && !isHeic) {
+                    alert(`Файл ${file.name} не является изображением`);
+                    return;
+                }
 
-        const isImage = file.type.startsWith('image/');
-        const isHeic = file.name.toLowerCase().endsWith('.heic') ||
-                       file.name.toLowerCase().endsWith('.heif');
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        images.push({
+                            file: file,
+                            preview: e.target.result,
+                            width: img.width,
+                            height: img.height
+                        });
+                        updateUI();
+                    };
 
-        if (!isImage && !isHeic) {
-            alert(`Файл ${file.name} не является изображением`);
-            return;
+                    // Для HEIC создаем placeholder
+                    if (isHeic) {
+                        img.src = 'data:image/svg+xml;base64,' + btoa(`
+                            <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+                                <rect width="100" height="100" fill="#f0f0f0"/>
+                                <text x="50" y="50" text-anchor="middle" fill="#666" font-size="12">HEIC</text>
+                            </svg>
+                        `);
+                    } else {
+                        img.src = e.target.result;
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
         }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                images.push({
-                    file: file,
-                    preview: e.target.result,
-                    width: img.width,
-                    height: img.height
-                });
-                updateUI();
-            };
-
-            // Для HEIC создаем placeholder
-            if (isHeic) {
-                img.src = 'data:image/svg+xml;base64,' + btoa(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
-                        <rect width="100" height="100" fill="#f0f0f0"/>
-                        <text x="50" y="50" text-anchor="middle" fill="#666" font-size="12">HEIC</text>
-                    </svg>
-                `);
-            } else {
-                img.src = e.target.result;
-            }
-        };
-        reader.readAsDataURL(file);
-    });
-}
 
         function updateUI() {
             // Обновляем статистику
@@ -523,6 +585,26 @@ function handleFiles(e) {
             }
         }
 
+        // Функция обновления прогресс-бара
+        function updateProgress(percentage, filename = '') {
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = Math.round(percentage) + '%';
+            progressPercentage.textContent = Math.round(percentage) + '%';
+            progressFilename.textContent = filename;
+
+            // Показываем/скрываем прогресс-бар
+            if (percentage > 0 && percentage < 100) {
+                progressContainer.style.display = 'block';
+                progressInfo.classList.add('active');
+            } else if (percentage >= 100) {
+                // Скрываем через небольшой промежуток времени после завершения
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressInfo.classList.remove('active');
+                }, 500);
+            }
+        }
+
         async function submitForm() {
             if (images.length === 0) {
                 alert('Выберите хотя бы одно изображение');
@@ -543,43 +625,82 @@ function handleFiles(e) {
             loadingSpinner.style.display = 'inline-block';
             submitBtn.disabled = true;
 
+            // Сбрасываем прогресс-бар
+            updateProgress(0, 'Начало обработки...');
+
             try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
+                // Создаем XMLHttpRequest для отслеживания прогресса
+                const xhr = new XMLHttpRequest();
+
+                // Обработчик прогресса загрузки
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const uploadPercent = (e.loaded / e.total) * 100;
+                        updateProgress(uploadPercent * 0.3, 'Загрузка файлов...');
+                    }
                 });
 
-                if (!response.ok) {
-                    const error = await response.text();
-                    throw new Error(error);
-                }
+                // Обработчик прогресса загрузки с сервера (для больших файлов)
+                xhr.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const downloadPercent = (e.loaded / e.total) * 100;
+                        updateProgress(30 + (downloadPercent * 0.7), 'Обработка на сервере...');
+                    }
+                });
 
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
+                xhr.open('POST', '/upload');
+                xhr.responseType = 'blob';
 
-                const filename = images.length === 1
-                    ? images[0].file.name.replace(/\.[^/.]+$/, "") + '_converted.' + format.toLowerCase()
-                    : 'images.zip';
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        updateProgress(100, 'Завершено!');
 
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
+                        const blob = xhr.response;
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+
+                        const filename = images.length === 1
+                            ? images[0].file.name.replace(/\.[^/.]+$/, "") + '_converted.' + format.toLowerCase()
+                            : 'images.zip';
+
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+
+                        // Очищаем изображения после успешной обработки
+                        images = [];
+                        updateUI();
+                    } else {
+                        updateProgress(0);
+                        alert('Ошибка: ' + xhr.statusText);
+                    }
+                };
+
+                xhr.onerror = function() {
+                    updateProgress(0);
+                    alert('Произошла ошибка при отправке файлов.');
+                };
+
+                xhr.onloadend = function() {
+                    loadingSpinner.style.display = 'none';
+                    submitBtn.disabled = false;
+                };
+
+                // Отправляем запрос
+                xhr.send(formData);
 
             } catch (error) {
-                alert('Ошибка: ' + error.message);
-            } finally {
+                updateProgress(0);
                 loadingSpinner.style.display = 'none';
                 submitBtn.disabled = false;
+                alert('Ошибка: ' + error.message);
             }
         }
-
 
         updateUI();
     </script>
 </body>
-
 </html>
