@@ -1,3 +1,4 @@
+import pillow_heif
 import random
 import string
 import os
@@ -7,7 +8,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from PIL import Image
 import io
 import zipfile
-
+pillow_heif.register_heif_opener()
 app = Flask(__name__)
 app.secret_key = '123'
 
@@ -227,20 +228,61 @@ def upload_images():
     for file in files:
         try:
             original_format = file.filename.rsplit('.', 1)[-1].upper() if '.' in file.filename else 'UNKNOWN'
-            img = Image.open(file.stream)
+
+
+            file_data = file.read()
+            file_stream = io.BytesIO(file_data)
+
+
+            file_extension = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+
+            if file_extension in ['heic', 'heif']:
+
+                try:
+                    img = Image.open(file_stream)
+
+                    if img.format != 'HEIF':
+
+                        file_stream.seek(0)
+                        heif_file = pillow_heif.open_heif(file_stream)
+                        img = Image.frombytes(
+                            heif_file.mode,
+                            heif_file.size,
+                            heif_file.data,
+                            "raw",
+                            heif_file.mode,
+                            heif_file.stride,
+                        )
+                except Exception as heif_error:
+                    flash(f'Ошибка обработки HEIC файла {file.filename}: {str(heif_error)}', 'error')
+                    continue
+            else:
+
+                file_stream.seek(0)
+                img = Image.open(file_stream)
+
             img = process_image(img, width, height, format)
 
             img_bytes = io.BytesIO()
-            img.save(img_bytes, format=format, quality=90)
+
+
+            save_format = format
+            save_kwargs = {'quality': 90}
+
+            if format == 'HEIC':
+
+                save_format = 'JPEG'
+                flash(f'HEIC файл {file.filename} будет конвертирован в JPEG', 'info')
+
+            img.save(img_bytes, format=save_format, **save_kwargs)
             img_bytes.seek(0)
             file_size = len(img_bytes.getvalue())
-
 
             add_to_history(
                 user_id=user_id,
                 filename=file.filename,
                 original_format=original_format,
-                converted_format=format,
+                converted_format=format if format != 'HEIC' else 'JPEG',  # Учитываем конвертацию HEIC
                 width=width or img.width,
                 height=height or img.height,
                 file_size=file_size
@@ -248,10 +290,12 @@ def upload_images():
 
             processed.append({
                 'data': img_bytes,
-                'name': file.filename.rsplit('.', 1)[0] + f'.{format.lower()}'
+                'name': file.filename.rsplit('.', 1)[0] + f'.{save_format.lower()}'
             })
+
         except Exception as e:
             print(f"Error processing image: {e}")
+            flash(f'Ошибка обработки {file.filename}: {str(e)}', 'error')
             continue
 
     if not processed:
@@ -260,7 +304,7 @@ def upload_images():
     if len(processed) == 1:
         return send_file(
             processed[0]['data'],
-            mimetype=f'image/{format.lower()}',
+            mimetype=f'image/{save_format.lower() if format == "HEIC" else format.lower()}',
             as_attachment=True,
             download_name=processed[0]['name']
         )
@@ -277,7 +321,6 @@ def upload_images():
         as_attachment=True,
         download_name='images.zip'
     )
-
 
 @app.route('/api/history')
 @login_required
