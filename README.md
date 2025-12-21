@@ -57,7 +57,7 @@ git clone https://github.com/ddhodfmfghm/kkkk.git
 cd kkkk
 ```
 ```bash
-pip install flask pillow
+pip install flask pillow pillow-heif
 ```
 ## 💻 Использование
 ### 1. Регистрация и вход
