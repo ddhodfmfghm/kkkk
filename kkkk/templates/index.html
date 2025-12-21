@@ -671,8 +671,7 @@
                         window.URL.revokeObjectURL(url);
 
                         // Очищаем изображения после успешной обработки
-                        images = [];
-                        updateUI();
+
                     } else {
                         updateProgress(0);
                         alert('Ошибка: ' + xhr.statusText);
@@ -704,3 +703,4 @@
     </script>
 </body>
 </html>
+
