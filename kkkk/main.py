@@ -1,4 +1,4 @@
-import pillow_heif
+
 import random
 import string
 import os
@@ -8,15 +8,19 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from PIL import Image
 import io
 import zipfile
+import pillow_heif
+
+
 pillow_heif.register_heif_opener()
 app = Flask(__name__)
 app.secret_key = '123'
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-SUPPORTED_FORMATS = ['JPEG', 'PNG', 'BMP', 'GIF', 'WEBP']
+SUPPORTED_FORMATS = ['JPEG', 'PNG', 'BMP', 'GIF', 'WEBP', 'HEIC']
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, 'database.db')
+
 
 
 def init_db():
@@ -222,7 +226,14 @@ def process_image(img, width, height, format):
         width = int(img.width * ratio)
         img = img.resize((width, height), Image.Resampling.LANCZOS)
 
-    if format == 'JPEG' and img.mode in ('RGBA', 'P'):
+
+    if format == 'HEIC':
+
+        if img.mode in ('RGBA', 'LA', 'PA'):
+            img = img.convert('RGB')
+        elif img.mode == 'P':
+            img = img.convert('RGB')
+    elif format == 'JPEG' and img.mode in ('RGBA', 'P'):
         img = img.convert('RGB')
 
     return img
@@ -260,27 +271,21 @@ def upload_images():
 
             file_data = file.read()
             file_stream = io.BytesIO(file_data)
-
-
             file_extension = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
 
+
             if file_extension in ['heic', 'heif']:
-
                 try:
-                    img = Image.open(file_stream)
-
-                    if img.format != 'HEIF':
-
-                        file_stream.seek(0)
-                        heif_file = pillow_heif.open_heif(file_stream)
-                        img = Image.frombytes(
-                            heif_file.mode,
-                            heif_file.size,
-                            heif_file.data,
-                            "raw",
-                            heif_file.mode,
-                            heif_file.stride,
-                        )
+                    file_stream.seek(0)
+                    heif_file = pillow_heif.open_heif(file_stream)
+                    img = Image.frombytes(
+                        heif_file.mode,
+                        heif_file.size,
+                        heif_file.data,
+                        "raw",
+                        heif_file.mode,
+                        heif_file.stride,
+                    )
                 except Exception as heif_error:
                     flash(f'Ошибка обработки HEIC файла {file.filename}: {str(heif_error)}', 'error')
                     continue
@@ -289,53 +294,105 @@ def upload_images():
                 file_stream.seek(0)
                 img = Image.open(file_stream)
 
+
             img = process_image(img, width, height, format)
 
+
             img_bytes = io.BytesIO()
-
-
             save_format = format
-            save_kwargs = {'quality': 90}
+            save_kwargs = {}
 
-            if format == 'HEIC':
 
-                save_format = 'JPEG'
-                flash(f'HEIC файл {file.filename} будет конвертирован в JPEG', 'info')
+            if format == 'JPEG':
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
+                save_kwargs = {'quality': 90, 'optimize': True}
+            elif format == 'PNG':
+                save_kwargs = {'compress_level': 6}
+            elif format == 'WEBP':
+                save_kwargs = {'quality': 90}
+            elif format == 'HEIC':
+                # Для HEIC конвертируем в RGB если нужно
+                if img.mode in ('RGBA', 'LA', 'PA'):
+                    img = img.convert('RGB')
+                elif img.mode == 'P':
+                    img = img.convert('RGB')
+                save_kwargs = {'quality': 90}
+                save_format = 'HEIF'
 
-            img.save(img_bytes, format=save_format, **save_kwargs)
+
+            try:
+                img.save(img_bytes, format=save_format, **save_kwargs)
+            except Exception as save_error:
+
+                if format == 'HEIC':
+                    flash(f'Не удалось сохранить {file.filename} в HEIC: {save_error}. Сохраняем как JPEG', 'warning')
+                    img.save(img_bytes, format='JPEG', quality=90)
+                    actual_format = 'JPEG'
+                else:
+                    raise save_error
+            else:
+                actual_format = format
+
             img_bytes.seek(0)
             file_size = len(img_bytes.getvalue())
+
 
             add_to_history(
                 user_id=user_id,
                 filename=file.filename,
                 original_format=original_format,
-                converted_format=format if format != 'HEIC' else 'JPEG',  # Учитываем конвертацию HEIC
+                converted_format=actual_format,
                 width=width or img.width,
                 height=height or img.height,
                 file_size=file_size
             )
 
+
+            base_name = file.filename.rsplit('.', 1)[0]
+            if actual_format == 'HEIC':
+                extension = '.heic'
+            else:
+                extension = f'.{actual_format.lower()}'
+
             processed.append({
                 'data': img_bytes,
-                'name': file.filename.rsplit('.', 1)[0] + f'.{save_format.lower()}'
+                'name': base_name + extension
             })
 
         except Exception as e:
-            print(f"Error processing image: {e}")
+            print(f"Error processing image {file.filename}: {e}")
             flash(f'Ошибка обработки {file.filename}: {str(e)}', 'error')
             continue
 
     if not processed:
         return 'Failed to process images', 400
 
+
     if len(processed) == 1:
+
+        if actual_format == 'HEIC':
+            mime_type = 'image/heic'
+        elif actual_format == 'JPEG':
+            mime_type = 'image/jpeg'
+        elif actual_format == 'PNG':
+            mime_type = 'image/png'
+        elif actual_format == 'WEBP':
+            mime_type = 'image/webp'
+        elif actual_format == 'GIF':
+            mime_type = 'image/gif'
+        elif actual_format == 'BMP':
+            mime_type = 'image/bmp'
+        else:
+            mime_type = 'application/octet-stream'
+
         return send_file(
             processed[0]['data'],
-            mimetype=f'image/{save_format.lower() if format == "HEIC" else format.lower()}',
+            mimetype=mime_type,
             as_attachment=True,
             download_name=processed[0]['name']
         )
+
 
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
