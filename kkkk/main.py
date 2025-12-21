@@ -112,6 +112,34 @@ def login_required(f):
     return decorated_function
 
 
+def clear_conversion_history(user_id):
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute('DELETE FROM conversion_history WHERE user_id = ?', (user_id,))
+    connection.commit()
+    deleted_count = cursor.rowcount
+    connection.close()
+    return deleted_count
+
+
+@app.route('/clear_history', methods=['POST'])
+@login_required
+def clear_history():
+
+    user_id = get_user_id(session['username'])
+
+    try:
+        deleted_count = clear_conversion_history(user_id)
+        if deleted_count > 0:
+            flash(f'Удалено записей: {deleted_count}', 'success')
+        else:
+            flash('История уже пуста', 'info')
+    except Exception as e:
+        flash(f'Ошибка при очистке истории: {str(e)}', 'error')
+
+    return redirect(url_for('history'))
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'username' in session:

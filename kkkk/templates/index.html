@@ -431,11 +431,11 @@
             </div>
 
             <div class="preview-container" id="preview-container">
-                <!-- Превышки будут здесь -->
+
             </div>
         </div>
 
-        <!-- Прогресс-бар -->
+
         <div class="progress-container" id="progress-container">
             <div class="progress-bar" id="progress-bar"></div>
         </div>
@@ -465,14 +465,14 @@
         const submitBtn = document.getElementById('submit-btn');
         const loadingSpinner = document.getElementById('loading-spinner');
 
-        // Элементы прогресс-бара
+
         const progressContainer = document.getElementById('progress-container');
         const progressBar = document.getElementById('progress-bar');
         const progressInfo = document.getElementById('progress-info');
         const progressPercentage = document.getElementById('progress-percentage');
         const progressFilename = document.getElementById('progress-filename');
 
-        // Обработчики drag & drop
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropArea.addEventListener(eventName, preventDefaults, false);
             document.addEventListener(eventName, preventDefaults, false);
@@ -524,7 +524,7 @@
                         updateUI();
                     };
 
-                    // Для HEIC создаем placeholder
+
                     if (isHeic) {
                         img.src = 'data:image/svg+xml;base64,' + btoa(`
                             <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
@@ -541,14 +541,14 @@
         }
 
         function updateUI() {
-            // Обновляем статистику
+
             selectedFiles.textContent = `${images.length} файл(ов) выбрано`;
             document.getElementById('total-files').textContent = images.length;
 
             const totalSize = images.reduce((sum, img) => sum + img.file.size, 0);
             document.getElementById('total-size').textContent = formatBytes(totalSize);
 
-            // Обновляем предпросмотр
+
             previewContainer.innerHTML = '';
             images.forEach((img, index) => {
                 const item = document.createElement('div');
@@ -585,19 +585,19 @@
             }
         }
 
-        // Функция обновления прогресс-бара
+
         function updateProgress(percentage, filename = '') {
             progressBar.style.width = percentage + '%';
             progressBar.textContent = Math.round(percentage) + '%';
             progressPercentage.textContent = Math.round(percentage) + '%';
             progressFilename.textContent = filename;
 
-            // Показываем/скрываем прогресс-бар
+
             if (percentage > 0 && percentage < 100) {
                 progressContainer.style.display = 'block';
                 progressInfo.classList.add('active');
             } else if (percentage >= 100) {
-                // Скрываем через небольшой промежуток времени после завершения
+
                 setTimeout(() => {
                     progressContainer.style.display = 'none';
                     progressInfo.classList.remove('active');
@@ -625,14 +625,14 @@
             loadingSpinner.style.display = 'inline-block';
             submitBtn.disabled = true;
 
-            // Сбрасываем прогресс-бар
+
             updateProgress(0, 'Начало обработки...');
 
             try {
-                // Создаем XMLHttpRequest для отслеживания прогресса
+
                 const xhr = new XMLHttpRequest();
 
-                // Обработчик прогресса загрузки
+
                 xhr.upload.addEventListener('progress', function(e) {
                     if (e.lengthComputable) {
                         const uploadPercent = (e.loaded / e.total) * 100;
@@ -640,7 +640,7 @@
                     }
                 });
 
-                // Обработчик прогресса загрузки с сервера (для больших файлов)
+
                 xhr.addEventListener('progress', function(e) {
                     if (e.lengthComputable) {
                         const downloadPercent = (e.loaded / e.total) * 100;
@@ -670,7 +670,7 @@
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
 
-                        // Очищаем изображения после успешной обработки
+
 
                     } else {
                         updateProgress(0);
@@ -688,7 +688,7 @@
                     submitBtn.disabled = false;
                 };
 
-                // Отправляем запрос
+
                 xhr.send(formData);
 
             } catch (error) {

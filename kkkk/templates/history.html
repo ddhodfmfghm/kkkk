@@ -385,12 +385,44 @@
             }
         }
 
-        function clearHistory() {
-            if (confirm('Вы уверены, что хотите очистить всю историю? Это действие нельзя отменить.')) {
+         async function clearHistory() {
+        if (confirm('Вы уверены, что хотите очистить всю историю? Это действие нельзя отменить.')) {
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner';
+            spinner.style.marginLeft = '10px';
 
-                alert('Функция очистки истории в разработке');
+            const clearBtn = document.querySelector('button.btn-secondary');
+            clearBtn.disabled = true;
+            clearBtn.appendChild(spinner);
+
+            try {
+                const response = await fetch('/clear_history', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    const data = await response.json();
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        alert('Ошибка при очистке истории: ' + (data.error || 'Неизвестная ошибка'));
+                    }
+                }
+            } catch (error) {
+                console.error('Error clearing history:', error);
+                alert('Ошибка при отправке запроса');
+            } finally {
+                clearBtn.disabled = false;
+                clearBtn.removeChild(spinner);
             }
         }
+    }
+
     </script>
 </body>
 </html>
